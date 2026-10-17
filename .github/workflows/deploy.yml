@@ -1,71 +1,82 @@
-name: Java CI/CD with Docker
+
+name: Build and Deploy Spring Boot
 
 on:
   push:
-    branches: main
-env:
-  AWS_REGION: ap-southeast-2                   # set this to your preferred AWS region, e.g. us-west-1
-  ECR_REPOSITORY: codingcure/ecommerce-service # set this to your Amazon ECR repository name
-  CONTAINER_NAME: ci-cd
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'pom.xml'
+      - 'mvnw'
+      - '.mvn/**'
+      - 'Dockerfile'
+      - '.github/workflows/build-deploy.yml'
+
+permissions:
+  contents: write
+  packages: write
 
 jobs:
-  build:
-
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source code
+      - name: Checkout source
         uses: actions/checkout@v4
-      - name: Set up JDK 25
+
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          java-version: '25'
-          distribution: 'temurin'
-      - name: Analyze with SonarCloud
-        run: mvn clean verify sonar:sonar -Dsonar.token=${{ secrets.SONAR_TOKEN }}
-#
-#      - name: Configure AWS credentials
-#        uses: aws-actions/configure-aws-credentials@v1
-#        with:
-#          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#          aws-region: ${{ env.AWS_REGION }}
-#
-#      - name: Login to Amazon ECR
-#        id: login-ecr
-#        uses: aws-actions/amazon-ecr-login@v1
-#
-#      - name: Build, tag, and push image to Amazon ECR
-#        id: build-image
-#        env:
-#          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-#          IMAGE_TAG: latest
-#        run: |
-#          # Build a docker container and
-#          # push it to ECR so that it can
-#          # be deployed to ECS.
-#          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-#          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-#          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
-#      - name: Deploy to EC2
-#        uses: appleboy/ssh-action@v0.1.10
-#        with:
-#          host: ${{ secrets.EC2_HOST }}              # public IP/DNS of EC2
-#          username: ec2-user                         # or ubuntu, depending on AMI
-#          key: ${{ secrets.EC2_SSH_KEY }}            # your private key (.pem content)
-#          script: |
-#            aws ecr get-login-password --region ${{ env.AWS_REGION }} \
-#              | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
-#
-#            # Pull latest image
-#            docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
-#
-#            # Stop old container (if running)
-#            docker stop ${{ env.CONTAINER_NAME }} || true
-#            docker rm ${{ env.CONTAINER_NAME }} || true
-#
-#            # Run new container
-#            docker run -d \
-#            -p 80:8080 \
-#            --name ${{ env.CONTAINER_NAME }} \
-#            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Test and package
+        run: |
+          chmod +x ./mvnw
+          ./mvnw -B verify
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/mehran7711/cicd:sha-${{ github.sha }}
+
+      - name: Install yq
+        run: |
+          sudo curl -fsSL \
+            https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64 \
+            -o /usr/local/bin/yq
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Update Helm image tag
+        env:
+          IMAGE_NAME: ghcr.io/mehran7711/cicd
+          IMAGE_TAG: sha-${{ github.sha }}
+        run: |
+          yq -i \
+            '.image.repository = strenv(IMAGE_NAME) |
+             .image.tag = strenv(IMAGE_TAG)' \
+            helm/webapp/values.yaml
+
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add helm/webapp/values.yaml
+
+          if git diff --cached --quiet; then
+            echo "No Helm changes to commit"
+          else
+            git commit -m "chore(deploy): update image to ${IMAGE_TAG}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
