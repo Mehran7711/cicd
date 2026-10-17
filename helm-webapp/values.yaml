@@ -1,12 +1,11 @@
-appName: myhelmapp
-
-port: 80
-
-configmap:
-  name: myhelmapp-configmap-v1
-  data:
-    CUSTOM_HEADER: 'This app was deployed with helm!'
+replicaCount: 1
 
 image:
-  name: devopsjourney1/mywebapp
-  tag: latest
+  repository: nginx
+  tag: "1.29"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 80
