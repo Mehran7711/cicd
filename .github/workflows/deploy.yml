@@ -11,6 +11,8 @@ on:
       - 'mvnw'
       - '.mvn/**'
       - 'Dockerfile'
+      - '.dockerignore'
+      - 'helm/webapp/**'
       - '.github/workflows/build-deploy.yml'
 
 permissions:
@@ -29,7 +31,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '25'
           cache: maven
 
       - name: Test and package
@@ -49,7 +51,9 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/mehran7711/cicd:sha-${{ github.sha }}
+          tags: |
+            ghcr.io/mehran7711/webapp:sha-${{ github.sha }}
+            ghcr.io/mehran7711/webapp:latest
 
       - name: Install yq
         run: |
@@ -60,7 +64,7 @@ jobs:
 
       - name: Update Helm image tag
         env:
-          IMAGE_NAME: ghcr.io/mehran7711/cicd
+          IMAGE_NAME: ghcr.io/mehran7711/webapp
           IMAGE_TAG: sha-${{ github.sha }}
         run: |
           yq -i \

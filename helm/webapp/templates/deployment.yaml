@@ -1,20 +1,41 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}
+  name: webapp
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: 1
   selector:
     matchLabels:
-      app: {{ .Release.Name }}
+      app: webapp
   template:
     metadata:
       labels:
-        app: {{ .Release.Name }}
+        app: webapp
     spec:
       containers:
         - name: webapp
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "ghcr.io/mehran7711/webapp:latest"
+          imagePullPolicy: Always
           ports:
-            - containerPort: {{ .Values.service.targetPort }}
+            - containerPort: 8080
+
+#apiVersion: apps/v1
+#kind: Deployment
+#metadata:
+#  name: {{ .Release.Name }}
+#spec:
+#  replicas: {{ .values.replicaCount }}
+#  selector:
+#    matchLabels:
+#      app: {{ .Release.Name }}
+#  template:
+#    metadata:
+#      labels:
+#        app: {{ .Release.Name }}
+#    spec:
+#      containers:
+#        - name: webapp
+#          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+#          imagePullPolicy: {{ .Values.image.pullPolicy }}
+#          ports:
+#            - containerPort: {{ .Values.service.targetPort }}
