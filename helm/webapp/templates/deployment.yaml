@@ -1,4 +1,3 @@
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -13,6 +12,8 @@ spec:
       labels:
         app: {{ .Release.Name }}
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: webapp
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
