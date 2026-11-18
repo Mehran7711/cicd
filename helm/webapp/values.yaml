@@ -1,7 +1,7 @@
 replicaCount: 1
 image:
   repository: ghcr.io/mehran7711/webapp
-  tag: "sha-a8f1a7dbed23c46c2fb8f15bec5468cdff0ccc91"
+  tag: "sha-c0896885bee188cb9501be732c8547631f07d422"
   pullPolicy: Always
 service:
   type: ClusterIP
